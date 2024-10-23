@@ -1,0 +1,168 @@
+****************************
+## Dry run of helm charts
+****************************
+
+- helm install mydb bitnami/mysql --values values.yaml --dry-run
+
+# it gives you the yaml files being passed to Kube obejcts.
+
+  Refer the dry-run-logs for the yaml files.
+
+  Check STATUS: pending-install
+
+  instead of installed.
+
+# For helm install and upgrade commands, you need a K8S cluster. We are using minikube.
+
+  But if you just want to generate the yaml files which will be fed to Kube objects,
+  you can use 'kube template' command.
+
+  So this command can be used in CI / CD pipelines which do not have access to a K8s cluster.
+
+
+- helm template mydb bitnami/mysql --values values.yaml
+
+
+******************
+Release records
+******************
+Helm stores release records in K8S secrets
+
+- kubectl get secret
+
+NAME                         TYPE                 DATA   AGE
+sh.helm.release.v1.mydb.v1   helm.sh/release.v1   1      140m
+sh.helm.release.v1.mydb.v2   helm.sh/release.v1   1      134m
+
+- kubectl get secret sh.helm.release.v1.mydb.v2 -o yaml
+
+We can see the secrets encoded in base64 encryption.
+
+
+<some encoded secret>
+kind: Secret
+metadata:
+  creationTimestamp: "2024-10-23T03:43:04Z"
+  labels:
+    modifiedAt: "1729654637"
+    name: mydb
+    owner: helm
+    status: uninstalled
+    version: "2"
+  name: sh.helm.release.v1.mydb.v2
+  namespace: default
+  resourceVersion: "4107"
+  uid: 45e7dfa6-cb46-4b9f-a6fe-e4c442464501
+type: helm.sh/release.v1
+
+
+###################
+Rollback
+###################
+
+helm rollback mydb 2
+
+Helm rollback will only work if you had used --keep-history option during helm uninstall.
+
+- helm uninstall mydb
+    release "mydb" uninstalled
+- kubectl get secret
+No resources found in default namespace.
+
+
+#################
+Charts
+#################
+
+helm create firstchart
+
+cd firstchart
+
+ls
+
+Chart.yaml  charts      templates   values.yaml
+
+Chart.yml        => contains metadata about chart.
+charts folder    => if firstchart depends on other charts to get its job done, those charts need to be stored here.
+templates folder => all the templates like deployment.yml, service.yaml, ingress.yaml are stored which are used to render
+                    kubernetes manifest to package and deploy this project on k8s cluster.
+values.yaml      => Default values which go into templates stored in templates folder.
+
+
+# To install chart
+
+- helm install firstapp firstchart
+
+This command will install the chart on existing K8s cluster.
+
+by default, charts are nginx charts. so nginx pod will be running on k8s
+
+# To check deployment details, refer NOTES.txt in <chart-folder-name>/templates/NOTES.txt
+
+The output that we see after running helm install is exactly written in this file NOTES.txt and
+values will be replaces from values.yaml
+
+NAME: firstapp
+LAST DEPLOYED: Wed Oct 23 12:42:59 2024
+NAMESPACE: default
+STATUS: deployed
+REVISION: 1
+NOTES:
+1. Get the application URL by running these commands:
+  export POD_NAME=$(kubectl get pods --namespace default -l "app.kubernetes.io/name=firstchart,app.kubernetes.io/instance=firstapp" -o jsonpath="{.items[0].metadata.name}")
+
+  export CONTAINER_PORT=$(kubectl get pod --namespace default $POD_NAME -o jsonpath="{.spec.containers[0].ports[0].containerPort}")
+
+  echo "Visit http://127.0.0.1:8080 to use your application"
+
+  kubectl --namespace default port-forward $POD_NAME 8080:$CONTAINER_PORT
+
+
+AFter executing above 4 commands, type http://localhost:8080/ in browser.
+
+You can see the nginx server screen.
+
+
+************************************
+helm package
+************************************
+
+helm package firstchart
+
+
+helm package firstchart -u
+(this updates all the dependences in a helm chart before creating a tar gz file)
+
+*******************************
+Helm template actions
+*******************************
+
+{{  }}
+
+anything written between these brackets are template actions.
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "firstchart.fullname" . }}
+  labels:
+    {{- include "firstchart.labels" . | nindent 4 }}
+
+You can add below line in the above lines copied from deployment.yaml    
+
+*******************************
+helm schema validation
+*******************************
+Helm 3.0 onwards allows schema validation for values.yaml
+
+So you can provide values.schema.json in the same location as values.yaml and
+run the command
+
+helm lint .
+
+the lint command has to be run inside helm chart folder, where values.yaml resides.
+
+You can create the json schema for entire json file using site
+
+https://json2yaml.com/
+https://jsonSchema.net/

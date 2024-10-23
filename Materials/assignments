@@ -1,0 +1,83 @@
+Assignment 1: To install tomcat with below values
+
+
+Solution:
+
+values.yaml
+
+tomcatPassword: test
+service:
+  type: NodePort
+  nodePorts:
+    http: 30007
+
+
+Commands:
+
+
+- helm install mydb bitnami/tomcat --values values.yaml
+
+- echo Password: $(kubectl get secret --namespace default mydb-tomcat -o jsonpath="{.data.tomcat-password}" | base64 -d)
+
+output: test
+
+- export NODE_PORT=$(kubectl get --namespace default -o jsonpath="{.spec.ports[0].nodePort}" services mydb-tomcat)
+- export NODE_IP=$(kubectl get nodes --namespace default -o jsonpath="{.items[0].status.addresses[0].address}")
+
+
+- echo "Tomcat URL:            http://$NODE_IP:$NODE_PORT"
+
+output: Tomcat URL:            http://192.168.49.2:30007
+
+- echo "Tomcat Management URL: http://$NODE_IP:$NODE_PORT/manager"
+
+output: Tomcat Management URL: http://192.168.49.2:30007/manager
+
+- helm status mydb
+
+output:
+
+NAME: mydb
+LAST DEPLOYED: Wed Oct 23 09:07:16 2024
+NAMESPACE: default
+STATUS: deployed
+REVISION: 1
+TEST SUITE: None
+NOTES:
+CHART NAME: tomcat
+CHART VERSION: 11.2.23
+APP VERSION: 10.1.31
+
+
+- helm upgrade mydb bitnami/tomcat --values values.yaml
+
+output:
+
+Release "mydb" has been upgraded. Happy Helming!
+NAME: mydb
+LAST DEPLOYED: Wed Oct 23 09:13:03 2024
+NAMESPACE: default
+STATUS: deployed
+REVISION: 2
+TEST SUITE: None
+NOTES:
+CHART NAME: tomcat
+CHART VERSION: 11.2.23
+APP VERSION: 10.1.31
+
+- kubectl get secrets
+
+NAME                         TYPE                 DATA   AGE
+mydb-tomcat                  Opaque               1      7m2s
+sh.helm.release.v1.mydb.v1   helm.sh/release.v1   1      7m2s
+sh.helm.release.v1.mydb.v2   helm.sh/release.v1   1      75s
+
+
+- helm uninstall mydb --keep-history
+
+- kubectl get secrets
+
+output:
+NAME                         TYPE                 DATA   AGE
+sh.helm.release.v1.mydb.v1   helm.sh/release.v1   1      9m37s
+sh.helm.release.v1.mydb.v2   helm.sh/release.v1   1      3m50s
